@@ -134,22 +134,22 @@ class MT5RLAgent:
         # Check if data is empty
         if raw_data.empty:
             raise ValueError(f"No data available for {symbol} on timeframe {timeframe}")
-    
-        # Ensure volume column exists
-        if 'volume' not in raw_data:
-            if 'tick_volume' in raw_data:
-                raw_data['volume'] = raw_data['tick_volume']
-            else:
-                raw_data['volume'] = raw_data['real_volume']
         
-        if raw_data.empty:
-            raise ValueError(f"No data available for {symbol} on timeframe {timeframe}")
+        # Convert DataFrame to dictionary format for TechnicalIndicators
+        data_dict = {
+            'open': raw_data['open'].tolist(),
+            'high': raw_data['high'].tolist(),
+            'low': raw_data['low'].tolist(),
+            'close': raw_data['close'].tolist(),
+            'volume': raw_data['volume'].tolist()
+        }
         
         # Calculate technical indicators
-        processed_data = TechnicalIndicators.calculate_all_indicators(raw_data)
-        processed_data = TechnicalIndicators.detect_patterns(processed_data)
-        processed_data = TechnicalIndicators.calculate_market_regime(processed_data)
-        
+        processed_data = TechnicalIndicators.calculate_all_indicators(data_dict)
+
+        # Convert back to DataFrame
+        processed_data = pd.DataFrame(processed_data)
+
         # Remove NaN values
         processed_data = processed_data.dropna()
         
@@ -261,8 +261,7 @@ class MT5RLAgent:
                         model_path = f"models/{key}_step_{step_count}.pkl"
                         os.makedirs("models", exist_ok=True)
                         agent.save_model(model_path)
-
-                    self.logger.info(f"Model saved at {model_path}")
+                        self.logger.info(f"Model saved at {model_path}")
 
                 self.logger.info(f"Episode {episode + 1}/{episodes} completed for {key}, Reward: {episode_reward:.4f}")
                 

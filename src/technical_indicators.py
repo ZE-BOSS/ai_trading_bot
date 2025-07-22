@@ -9,7 +9,7 @@ import numpy as np
 class TechnicalIndicators:
     """Calculate various technical indicators"""
     
-    @staticmethod
+    # @staticmethod
     def calculate_all_indicators(data: dict) -> dict:
         """Calculate all technical indicators for a dataset"""
         if not data or 'close' not in data:

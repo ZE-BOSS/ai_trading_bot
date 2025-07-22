@@ -72,7 +72,7 @@ class MT5Connector:
         mt5.shutdown()
         self.connected = False
         self.logger.info("Disconnected from MT5")
-    
+    # deprecated
     def get_market_data(self, symbol: str, timeframe: str, count: int = 100) -> Dict:
         """Get market data for specified symbol and timeframe"""
         if self.demo_mode:
@@ -137,7 +137,7 @@ class MT5Connector:
                 return {}
     
     def get_historical_data(self, symbol: str, timeframe: int, count: int = 1000) -> pd.DataFrame:
-        """Retrieve historical market data"""
+        """Retrieve historical market data as DataFrame"""
         if self.demo_mode:
             # Generate demo data as DataFrame
             current_time = datetime.now()
@@ -152,7 +152,7 @@ class MT5Connector:
                 'close': prices,
                 'volume': [random.randint(100, 1000) for _ in range(count)]
             }
-            
+
             return pd.DataFrame(data).set_index('time')
         
         if not self.connected:
@@ -160,22 +160,43 @@ class MT5Connector:
             
         try:
             import MetaTrader5 as mt5
-            rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
-
+            # Map integer timeframes to MT5 constants
+            tf_map = {
+                1: mt5.TIMEFRAME_M1,
+                5: mt5.TIMEFRAME_M5,
+                15: mt5.TIMEFRAME_M15,
+                60: mt5.TIMEFRAME_H1
+            }
+            timeframe_mt5 = tf_map.get(timeframe, mt5.TIMEFRAME_M1)
+            
+            rates = mt5.copy_rates_from_pos(symbol, timeframe_mt5, 0, count)
             if rates is None:
                 self.logger.error(f"Failed to get data for {symbol}")
                 return pd.DataFrame()  # Return empty DataFrame
                 
-            # Convert to DataFrame
-            data = pd.DataFrame(rates)
-            data['time'] = pd.to_datetime(data['time'], unit='s')
-            data.set_index('time', inplace=True)
+            # Create DataFrame with proper datetime index
+            df = pd.DataFrame(rates)
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            df.set_index('time', inplace=True)
             
-            return data
+            # Rename columns and ensure volume exists
+            df.rename(columns={
+                'tick_volume': 'volume',
+                'open': 'open',
+                'high': 'high',
+                'low': 'low',
+                'close': 'close'
+            }, inplace=True)
+            
+            # Add volume if missing
+            if 'volume' not in df.columns:
+                df['volume'] = df['real_volume'] 
+            
+            return df[['open', 'high', 'low', 'close', 'volume']]
+            
         except Exception as e:
-            self.logger.error(f"Error getting historical data: {e}")
+            self.logger.error(f"Error getting historical data for {symbol}: {e}")
             return pd.DataFrame()  # Return empty DataFrame
-    
     def get_live_tick(self, symbol: str) -> Dict:
         """Get current tick data"""
         if not self.connected:
